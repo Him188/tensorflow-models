@@ -31,6 +31,12 @@ def main(_):
   params = exp_factory.get_exp_config(FLAGS.experiment)
   params.task.train_data.input_path = 'dummy'
   params.task.train_data.global_batch_size = FLAGS.batch_size
+  if getattr(params.task.model, 'num_classes', 0) <= 0:
+    params.task.model.num_classes = 2
+  params.trainer.train_steps = 1
+  params.trainer.optimizer_config.learning_rate.type = 'constant'
+  params.trainer.optimizer_config.learning_rate.constant.learning_rate = 0.0
+  params.trainer.optimizer_config.warmup.type = None
 
   strategy = tf.distribute.get_strategy()
   with strategy.scope():
@@ -48,8 +54,18 @@ def main(_):
                            optimizer=optimizer,
                            metrics=metrics)
 
-  dummy_ds = task.build_inputs(params.task.train_data)
-  sample = next(iter(dummy_ds))
+  seq_length = params.task.train_data.seq_length
+  dummy_ids = tf.zeros([FLAGS.batch_size, seq_length], tf.int32)
+  sample = {
+      'input_word_ids': dummy_ids,
+      'input_mask': dummy_ids,
+      'input_type_ids': dummy_ids,
+  }
+  label_field = getattr(params.task.train_data, 'label_field', 'label_ids')
+  if params.task.model.num_classes == 1:
+    sample[label_field] = tf.zeros([FLAGS.batch_size], tf.float32)
+  else:
+    sample[label_field] = tf.zeros([FLAGS.batch_size], tf.int32)
 
   train_step(sample)
   hlo_text = train_step.experimental_get_compiler_ir(sample)(stage='stablehlo')

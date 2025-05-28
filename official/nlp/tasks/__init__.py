@@ -19,4 +19,9 @@ from official.nlp.tasks.masked_lm import MaskedLMConfig, MaskedLMTask
 from official.nlp.tasks.question_answering import QuestionAnsweringConfig, QuestionAnsweringTask
 from official.nlp.tasks.sentence_prediction import SentencePredictionConfig, SentencePredictionTask
 from official.nlp.tasks.tagging import TaggingConfig, TaggingTask
-from official.nlp.tasks.translation import TranslationConfig, TranslationTask
+import logging
+
+try:
+  from official.nlp.tasks.translation import TranslationConfig, TranslationTask
+except Exception as e:  # translation requires optional deps like tensorflow_text
+  logging.warning('Translation task import failed: %s', e)

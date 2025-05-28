@@ -14,6 +14,13 @@
 
 """Experiments definition."""
 # pylint: disable=unused-import
+import logging
 from official.nlp.configs import finetuning_experiments
-from official.nlp.configs import pretraining_experiments
-from official.nlp.configs import wmt_transformer_experiments
+try:
+  from official.nlp.configs import pretraining_experiments
+except Exception as e:  # pretraining imports may require optional deps
+  logging.warning('Pretraining experiments import failed: %s', e)
+try:
+  from official.nlp.configs import wmt_transformer_experiments
+except Exception as e:
+  logging.warning('WMT experiments import failed: %s', e)
