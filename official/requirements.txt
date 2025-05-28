@@ -28,3 +28,5 @@ sacrebleu
 # Projects/vit dependencies
 immutabledict
 ai-edge-litert>=1.0.1
+
+tensorflow-text
