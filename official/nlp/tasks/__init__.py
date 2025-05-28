@@ -16,12 +16,20 @@
 # pylint: disable=g-multiple-import
 from official.nlp.tasks.electra_task import ElectraPretrainConfig, ElectraPretrainTask
 from official.nlp.tasks.masked_lm import MaskedLMConfig, MaskedLMTask
-from official.nlp.tasks.question_answering import QuestionAnsweringConfig, QuestionAnsweringTask
-from official.nlp.tasks.sentence_prediction import SentencePredictionConfig, SentencePredictionTask
+from official.nlp.tasks.question_answering import (
+    QuestionAnsweringConfig,
+    QuestionAnsweringTask,
+)
+from official.nlp.tasks.sentence_prediction import (
+    SentencePredictionConfig,
+    SentencePredictionTask,
+)
 from official.nlp.tasks.tagging import TaggingConfig, TaggingTask
-import logging
 
-try:
+try:  # Optional translation task depends on tensorflow_text.
+  import tensorflow_text  # pylint: disable=unused-import
+except Exception:  # pylint: disable=broad-except
+  TranslationConfig = None
+  TranslationTask = None
+else:
   from official.nlp.tasks.translation import TranslationConfig, TranslationTask
-except Exception as e:  # translation requires optional deps like tensorflow_text
-  logging.warning('Translation task import failed: %s', e)
