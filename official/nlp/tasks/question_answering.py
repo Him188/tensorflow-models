@@ -193,9 +193,9 @@ class QuestionAnsweringTask(base_task.Task):
         input_mask=dummy_ids,
         input_type_ids=dummy_ids)
     y = dict(
-        start_positions=tf.constant(0, dtype=tf.int32),
-        end_positions=tf.constant(1, dtype=tf.int32),
-        is_impossible=tf.constant(0, dtype=tf.int32))
+        start_positions=tf.zeros((1,), dtype=tf.int32),
+        end_positions=tf.ones((1,), dtype=tf.int32),
+        is_impossible=tf.zeros((1,), dtype=tf.int32))
     return x, y
 
   def build_inputs(self, params, input_context=None):
@@ -405,11 +405,11 @@ class XLNetQuestionAnsweringTask(QuestionAnsweringTask):
         class_index=zero,
         is_impossible=zero,
         paragraph_mask=dummy_ids,
-        start_positions=tf.zeros((1), dtype=tf.int32))
+        start_positions=tf.zeros((1,), dtype=tf.int32))
     y = dict(
-        start_positions=tf.zeros((1), dtype=tf.int32),
-        end_positions=tf.ones((1), dtype=tf.int32),
-        is_impossible=zero)
+        start_positions=tf.zeros((1,), dtype=tf.int32),
+        end_positions=tf.ones((1,), dtype=tf.int32),
+        is_impossible=tf.zeros((1,), dtype=tf.int32))
     return x, y
 
   def validation_step(self, inputs, model: tf_keras.Model, metrics=None):
