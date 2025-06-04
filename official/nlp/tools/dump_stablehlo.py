@@ -62,7 +62,8 @@ def main(_):
   params.runtime.enable_xla = True
   params.task.train_data.input_path = 'dummy'
   params.task.train_data.global_batch_size = FLAGS.batch_size
-  params.task.model.num_classes = max(1, params.task.model.num_classes)
+  if hasattr(params.task.model, "num_classes"):
+    params.task.model.num_classes = max(1, params.task.model.num_classes)
   # Simplify optimizer configuration to avoid dependencies on the global step.
   params.trainer.optimizer_config.learning_rate.type = 'constant'
   params.trainer.optimizer_config.learning_rate.constant.learning_rate = 0.0
