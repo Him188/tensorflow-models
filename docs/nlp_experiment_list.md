@@ -12,4 +12,7 @@ The following experiments are registered in the NLP library and can be used with
 - `electra/pretraining`
 - `wmt_transformer/large`
 
-Use `python -m official.nlp.tools.collect_all_stablehlo` to produce StableHLO files for each of these experiments. Results are written under the `output/` directory by default.
+Use `python -m official.nlp.tools.collect_all_stablehlo` to produce StableHLO
+files for each of these experiments. For every combination of batch size
+(`1, 4, 8, 16`) and iteration count (`1, 4, 16`), results are written under the
+`output/BATCHSIZE_ITERATIONS/` directory by default.
