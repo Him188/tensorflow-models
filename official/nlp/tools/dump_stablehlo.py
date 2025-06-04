@@ -51,8 +51,8 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string('experiment', None, 'Experiment config name.')
 flags.DEFINE_string('output', 'stablehlo.txt', 'File to write StableHLO text.')
-flags.DEFINE_integer('batch_size', 1, 'Global batch size for dummy inputs.')
-flags.DEFINE_integer('num_devices', 1, 'Number of logical devices for MirroredStrategy.')
+flags.DEFINE_integer('batch_size', 4, 'Global batch size for dummy inputs.')
+flags.DEFINE_integer('num_devices', 2, 'Number of logical devices for MirroredStrategy.')
 flags.DEFINE_integer('iterations', 2,
                      'Number of training iterations to include in the StableHLO.')
 
