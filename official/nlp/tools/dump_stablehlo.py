@@ -8,7 +8,7 @@ Example:
 ```
 python -m official.nlp.tools.dump_stablehlo \
     --experiment=bert/sentence_prediction \
-    --output=/tmp/bert_train.stablehlo \
+    --output=output/bert_train.stablehlo \
     --num_devices=2
 ```
 """
@@ -65,17 +65,18 @@ def main(_):
   params.trainer.optimizer_config.learning_rate.constant.learning_rate = 0.0
   params.trainer.optimizer_config.warmup.type = None
 
-  # if FLAGS.num_devices > 1:
-  #   strategy = tf.distribute.MirroredStrategy()
-  # else:
-  #   strategy = tf.distribute.get_strategy()
-  # with strategy.scope():
-  task = task_factory.get_task(params.task)
-  model = task.build_model()
-  opt_factory = optimization.OptimizerFactory(params.trainer.optimizer_config)
-  learning_rate = opt_factory.build_learning_rate()
-  optimizer = opt_factory.build_optimizer(learning_rate)
-  metrics = None
+  if FLAGS.num_devices > 1:
+    strategy = tf.distribute.MirroredStrategy()
+  else:
+    strategy = tf.distribute.get_strategy()
+
+  with strategy.scope():
+    task = task_factory.get_task(params.task)
+    model = task.build_model()
+    opt_factory = optimization.OptimizerFactory(params.trainer.optimizer_config)
+    learning_rate = opt_factory.build_learning_rate()
+    optimizer = opt_factory.build_optimizer(learning_rate)
+    metrics = None
 
   @tf.function(jit_compile=True)
   def train_step(inputs):
@@ -84,11 +85,16 @@ def main(_):
                            optimizer=optimizer,
                            metrics=metrics)
 
-  dummy_ds = task.build_inputs(params.task.train_data)
-  sample = next(iter(dummy_ds))
+  @tf.function(jit_compile=True)
+  def distributed_step(inputs):
+    return strategy.run(train_step, args=(inputs,))
 
-  train_step(sample)
-  hlo_text = train_step.experimental_get_compiler_ir(sample)(stage='hlo')
+  dummy_ds = task.build_inputs(params.task.train_data)
+  distributed_ds = strategy.experimental_distribute_dataset(dummy_ds)
+  sample = next(iter(distributed_ds))
+
+  distributed_step(sample)
+  hlo_text = distributed_step.experimental_get_compiler_ir(sample)(stage='hlo')
 
   with tf.io.gfile.GFile(FLAGS.output, 'w') as f:
     f.write(hlo_text)
