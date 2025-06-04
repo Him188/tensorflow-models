@@ -78,6 +78,34 @@ def main(_):
     optimizer = opt_factory.build_optimizer(learning_rate)
     metrics = None
 
+    # Replace apply_gradients with a version that performs explicit
+    # cross-replica summation using ReplicaContext.all_reduce. This allows
+    # gradient aggregation to be captured in the StableHLO.
+    _orig_apply_gradients = optimizer.apply_gradients
+
+    def _apply_gradients_all_reduce(grads_and_vars, name=None,
+                                    experimental_aggregate_gradients=True):
+      grads_and_vars = list(grads_and_vars)
+      grads, vars = zip(*grads_and_vars)
+      replica_ctx = tf.distribute.get_replica_context()
+      if replica_ctx:
+        reduced = []
+        for g in grads:
+          if g is None:
+            reduced.append(None)
+            continue
+          if isinstance(g, tf.IndexedSlices):
+            g = tf.convert_to_tensor(g)
+          reduced.append(
+              replica_ctx.all_reduce(tf.distribute.ReduceOp.SUM, g))
+        grads_and_vars = list(zip(reduced, vars))
+      return _orig_apply_gradients(
+          grads_and_vars,
+          name=name,
+          experimental_aggregate_gradients=False)
+
+    optimizer.apply_gradients = _apply_gradients_all_reduce
+
   @tf.function(jit_compile=True)
   def train_step(inputs):
     return task.train_step(inputs,
@@ -85,7 +113,6 @@ def main(_):
                            optimizer=optimizer,
                            metrics=metrics)
 
-  @tf.function(jit_compile=True)
   def distributed_step(inputs):
     return strategy.run(train_step, args=(inputs,))
 
@@ -93,12 +120,26 @@ def main(_):
   distributed_ds = strategy.experimental_distribute_dataset(dummy_ds)
   sample = next(iter(distributed_ds))
 
-  distributed_step(sample)
-  hlo_text = distributed_step.experimental_get_compiler_ir(sample)(stage='hlo')
+  # distributed_step(sample)
+
+  def _first_replica_value(x):
+    if isinstance(x, tf.distribute.DistributedValues):
+      return strategy.experimental_local_results(x)[0]
+    return x
+
+  # Get the StableHLO for the compiled train_step while still in replica context
+  def _get_ir_fn(inputs):
+    return train_step.experimental_get_compiler_ir(inputs)
+
+  ir_fn = strategy.run(_get_ir_fn, args=(sample,))
+  ir_fn = strategy.experimental_local_results(ir_fn)[0]
+
+  local_sample = tf.nest.map_structure(_first_replica_value, sample)
+  hlo_text = ir_fn(stage='stablehlo')
 
   with tf.io.gfile.GFile(FLAGS.output, 'w') as f:
     f.write(hlo_text)
-  tf.print('StableHLO written to', FLAGS.output)
+  print('StableHLO written to', FLAGS.output)
 
 
 if __name__ == '__main__':
