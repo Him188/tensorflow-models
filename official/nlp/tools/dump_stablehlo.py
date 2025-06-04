@@ -80,9 +80,7 @@ def main(_):
     opt_factory = optimization.OptimizerFactory(params.trainer.optimizer_config)
     learning_rate = opt_factory.build_learning_rate()
     optimizer = opt_factory.build_optimizer(learning_rate)
-    # Some tasks expect a non-empty metrics list. Build default metrics
-    # using the task's `build_metrics` method.
-    metrics = task.build_metrics()
+    metrics = task.build_metrics(training=True)
 
     # Replace apply_gradients with a version that performs explicit
     # cross-replica summation using ReplicaContext.all_reduce. This allows
@@ -114,15 +112,16 @@ def main(_):
 
   @tf.function(jit_compile=True)
   def train_loop(inputs):
-    # Execute ``train_step`` multiple times under XLA. The loop return value is
-    # unused, so we avoid tracking intermediate logs to simplify shape
-    # invariants.
-    for _ in tf.range(FLAGS.iterations):
-      task.train_step(inputs,
-                      model=model,
-                      optimizer=optimizer,
-                      metrics=metrics)
-    return tf.constant(0)
+    logs = task.train_step(inputs,
+                           model=model,
+                           optimizer=optimizer,
+                           metrics=metrics)
+    for _ in tf.range(FLAGS.iterations - 1):
+      logs = task.train_step(inputs,
+                             model=model,
+                             optimizer=optimizer,
+                             metrics=metrics)
+    return logs
 
   def distributed_step(inputs):
     return strategy.run(train_loop, args=(inputs,))

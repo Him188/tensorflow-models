@@ -110,9 +110,21 @@ class MaskedLMTask(base_task.Task):
     """Returns tf.data.Dataset for pretraining."""
     if params.input_path == 'dummy':
 
+      # Some input configs (e.g. dynamic pretraining) do not provide
+      # ``seq_length`` or ``max_predictions_per_seq``.  These shapes are only
+      # required for creating dummy tensors, so fall back to sensible defaults
+      # when the attributes are missing.
+      seq_length = getattr(params, 'seq_length', None)
+      if seq_length is None:
+        seq_length = max(getattr(params, 'seq_bucket_lengths', [128]))
+
+      max_predictions = getattr(params, 'max_predictions_per_seq', None)
+      if max_predictions is None:
+        max_predictions = 76
+
       def dummy_data(_):
-        dummy_ids = tf.zeros((1, params.seq_length), dtype=tf.int32)
-        dummy_lm = tf.zeros((1, params.max_predictions_per_seq), dtype=tf.int32)
+        dummy_ids = tf.zeros((1, seq_length), dtype=tf.int32)
+        dummy_lm = tf.zeros((1, max_predictions), dtype=tf.int32)
         return dict(
             input_word_ids=dummy_ids,
             input_mask=dummy_ids,
