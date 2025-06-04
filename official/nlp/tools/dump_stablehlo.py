@@ -1,15 +1,16 @@
 """Utility to dump StableHLO for an NLP model training step.
 
-This script builds a model from an experiment config and runs a single
-training step with dummy data under XLA compilation. The StableHLO text for
-that compiled training step is written to the specified output file.
+This script builds a model from an experiment config and runs a small
+training loop with dummy data under XLA compilation. The StableHLO text for
+that compiled training step sequence is written to the specified output file.
 
 Example:
 ```
 python -m official.nlp.tools.dump_stablehlo \
     --experiment=bert/sentence_prediction \
     --output=output/bert_train.stablehlo \
-    --num_devices=2
+    --num_devices=2 \
+    --iterations=2
 ```
 """
 from absl import app
@@ -52,6 +53,8 @@ flags.DEFINE_string('experiment', None, 'Experiment config name.')
 flags.DEFINE_string('output', 'stablehlo.txt', 'File to write StableHLO text.')
 flags.DEFINE_integer('batch_size', 1, 'Global batch size for dummy inputs.')
 flags.DEFINE_integer('num_devices', 1, 'Number of logical devices for MirroredStrategy.')
+flags.DEFINE_integer('iterations', 2,
+                     'Number of training iterations to include in the StableHLO.')
 
 
 def main(_):
@@ -107,14 +110,17 @@ def main(_):
     optimizer.apply_gradients = _apply_gradients_all_reduce
 
   @tf.function(jit_compile=True)
-  def train_step(inputs):
-    return task.train_step(inputs,
-                           model=model,
-                           optimizer=optimizer,
-                           metrics=metrics)
+  def train_loop(inputs):
+    logs = None
+    for _ in tf.range(FLAGS.iterations):
+      logs = task.train_step(inputs,
+                             model=model,
+                             optimizer=optimizer,
+                             metrics=metrics)
+    return logs
 
   def distributed_step(inputs):
-    return strategy.run(train_step, args=(inputs,))
+    return strategy.run(train_loop, args=(inputs,))
 
   dummy_ds = task.build_inputs(params.task.train_data)
   distributed_ds = strategy.experimental_distribute_dataset(dummy_ds)
@@ -127,9 +133,9 @@ def main(_):
       return strategy.experimental_local_results(x)[0]
     return x
 
-  # Get the StableHLO for the compiled train_step while still in replica context
+  # Get the StableHLO for the compiled training loop while still in replica context
   def _get_ir_fn(inputs):
-    return train_step.experimental_get_compiler_ir(inputs)
+    return train_loop.experimental_get_compiler_ir(inputs)
 
   ir_fn = strategy.run(_get_ir_fn, args=(sample,))
   ir_fn = strategy.experimental_local_results(ir_fn)[0]
