@@ -149,7 +149,16 @@ def bert_tagging() -> cfg.ExperimentConfig:
       task=tagging.TaggingConfig(
           train_data=tagging_dataloader.TaggingDataConfig(),
           validation_data=tagging_dataloader.TaggingDataConfig(
-              is_training=False, drop_remainder=False)),
+              is_training=False, drop_remainder=False),
+          class_names=[
+              'O',
+              'B-PER',
+              'I-PER',
+              'B-LOC',
+              'I-LOC',
+              'B-ORG',
+              'I-ORG',
+          ]),
       trainer=cfg.TrainerConfig(
           optimizer_config=optimization.OptimizationConfig({
               'optimizer': {
