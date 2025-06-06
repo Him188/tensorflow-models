@@ -48,6 +48,9 @@ def main(_):
             for exp in experiments:
                 outfile = os.path.join(
                     config_dir, exp.replace("/", "_") + ".stablehlo")
+                if os.path.exists(outfile):
+                    print(f"Skipping {outfile}, already exists")
+                    continue
                 cmd = [
                     sys.executable,
                     "-m",
