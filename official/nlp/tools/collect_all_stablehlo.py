@@ -11,7 +11,7 @@ from official.core import exp_factory
 FLAGS = flags.FLAGS
 
 flags.DEFINE_multi_integer(
-    'batch_sizes', [1, 4, 8, 16],
+    'batch_sizes', [1, 4, 8, 16, 64],
     'Batch sizes to generate StableHLO for.')
 flags.DEFINE_multi_integer(
     'iterations', [1, 4, 16],

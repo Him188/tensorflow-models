@@ -90,12 +90,21 @@ def _create_dummy_tfrecord(src_lang: str, tgt_lang: str) -> str:
 def main(_):
   params = exp_factory.get_exp_config(FLAGS.experiment)
   params.runtime.enable_xla = True
-  params.task.train_data.input_path = _create_dummy_tfrecord(
-      params.task.train_data.src_lang, params.task.train_data.tgt_lang)
-  params.task.train_data.tfds_name = ''
-  params.task.train_data.global_batch_size = max(
-      FLAGS.batch_size, params.task.train_data.max_seq_length)
-  params.task.train_data.static_batch = True
+
+  if hasattr(params.task.train_data, "src_lang"):
+    try:
+      params.task.train_data.input_path = _create_dummy_tfrecord(
+        params.task.train_data.src_lang, params.task.train_data.tgt_lang)
+    except:
+      pass
+    params.task.train_data.tfds_name = ''
+    if hasattr(params.task.train_data, 'max_seq_length'):
+      params.task.train_data.global_batch_size = max(
+          FLAGS.batch_size, params.task.train_data.max_seq_length)
+    params.task.train_data.static_batch = True
+  else:
+    params.task.train_data.input_path = 'dummy'
+  params.task.train_data.global_batch_size = FLAGS.batch_size
   params.task.train_data.is_training = True
   if hasattr(params.task, 'sentencepiece_model_path') and not params.task.sentencepiece_model_path:
     params.task.sentencepiece_model_path = _create_sentencepiece_model()
