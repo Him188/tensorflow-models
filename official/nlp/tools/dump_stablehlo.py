@@ -18,6 +18,7 @@ from absl import flags
 import os
 import sys
 import types
+import tempfile
 import tensorflow as tf, tf_keras
 
 # Allow running the script directly via its file path.
@@ -34,6 +35,7 @@ except ModuleNotFoundError:
 from official.core import exp_factory
 from official.core import task_factory
 from official.modeling import optimization
+from sentencepiece import SentencePieceTrainer
 
 # Import registry modules but allow missing optional dependencies such as
 # tensorflow_text. This mirrors the behavior of ``exp_factory`` when used in
@@ -57,11 +59,46 @@ flags.DEFINE_integer('iterations', 4,
                      'Number of training iterations to include in the StableHLO.')
 
 
+def _create_sentencepiece_model() -> str:
+  """Creates a temporary sentencepiece model for dummy tokenization."""
+  tmp_dir = tempfile.mkdtemp()
+  input_txt = os.path.join(tmp_dir, 'input.txt')
+  with tf.io.gfile.GFile(input_txt, 'w') as f:
+    f.write('a b c d e f g h i j\n')
+  model_prefix = os.path.join(tmp_dir, 'sp')
+  argstr = ' '.join([
+      f'--input={input_txt}', '--vocab_size=20', f'--model_prefix={model_prefix}',
+      '--model_type=bpe', '--bos_id=-1', '--pad_id=0', '--eos_id=1', '--unk_id=2'
+  ])
+  SentencePieceTrainer.Train(argstr)
+  return f'{model_prefix}.model'
+
+
+def _create_dummy_tfrecord(src_lang: str, tgt_lang: str) -> str:
+  """Creates a temporary TFRecord with a single example."""
+  tmp_dir = tempfile.mkdtemp()
+  record_path = os.path.join(tmp_dir, 'data.tfrecord')
+  example = tf.train.Example(features=tf.train.Features(feature={
+      src_lang: tf.train.Feature(bytes_list=tf.train.BytesList(value=[b'a b'])),
+      tgt_lang: tf.train.Feature(bytes_list=tf.train.BytesList(value=[b'a b'])),
+  }))
+  with tf.io.TFRecordWriter(record_path) as writer:
+    writer.write(example.SerializeToString())
+  return record_path
+
+
 def main(_):
   params = exp_factory.get_exp_config(FLAGS.experiment)
   params.runtime.enable_xla = True
-  params.task.train_data.input_path = 'dummy'
-  params.task.train_data.global_batch_size = FLAGS.batch_size
+  params.task.train_data.input_path = _create_dummy_tfrecord(
+      params.task.train_data.src_lang, params.task.train_data.tgt_lang)
+  params.task.train_data.tfds_name = ''
+  params.task.train_data.global_batch_size = max(
+      FLAGS.batch_size, params.task.train_data.max_seq_length)
+  params.task.train_data.static_batch = True
+  params.task.train_data.is_training = True
+  if hasattr(params.task, 'sentencepiece_model_path') and not params.task.sentencepiece_model_path:
+    params.task.sentencepiece_model_path = _create_sentencepiece_model()
   if hasattr(params.task.model, "num_classes"):
     params.task.model.num_classes = max(1, params.task.model.num_classes)
   # Simplify optimizer configuration to avoid dependencies on the global step.
