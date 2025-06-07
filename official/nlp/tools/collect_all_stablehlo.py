@@ -41,11 +41,11 @@ def main(_):
     os.makedirs(base_dir, exist_ok=True)
     experiments = get_nlp_experiments()
 
-    for batch in FLAGS.batch_sizes:
-        for iters in FLAGS.iterations:
-            config_dir = os.path.join(base_dir, f"{batch}_{iters}")
-            os.makedirs(config_dir, exist_ok=True)
-            for exp in experiments:
+    for exp in experiments:
+        for batch in FLAGS.batch_sizes:
+            for iters in FLAGS.iterations:
+                config_dir = os.path.join(base_dir, f"{batch}_{iters}")
+                os.makedirs(config_dir, exist_ok=True)
                 outfile = os.path.join(
                     config_dir, exp.replace("/", "_") + ".stablehlo")
                 if os.path.exists(outfile):
